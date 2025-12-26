@@ -3,12 +3,11 @@ import { Todo } from '../types/Todo';
 
 interface TodoListProps {
   todos: Todo[];
-  filterByStatus: 'all' | 'active' | 'completed';
   toggleTodo: (id: number) => void;
   deleteTodo: (id: number) => void;
   updateTodo: (id: number, title: string) => void;
-  tempTodo?: number | null;
   deletingTodos?: number[];
+  updatingTodos?: number[];
 }
 
 export const TodoList: React.FC<TodoListProps> = ({
@@ -16,8 +15,8 @@ export const TodoList: React.FC<TodoListProps> = ({
   toggleTodo,
   deleteTodo,
   updateTodo,
-  tempTodo,
   deletingTodos = [],
+  updatingTodos = [],
 }) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -27,48 +26,42 @@ export const TodoList: React.FC<TodoListProps> = ({
     setEditValue(todo.title);
   };
 
-  const handleSave = () => {
-    if (editingId) {
-      const triimedValue = editValue.trim();
+  const handleSave = async () => {
+    if (!editingId) return;
 
-      if (triimedValue) {
-        updateTodo(editingId, triimedValue);
+    const trimmedValue = editValue.trim();
+    const currentTodo = todos.find(t => t.id === editingId);
+
+    if (currentTodo && trimmedValue === currentTodo.title) {
+      setEditingId(null);
+      return;
+    }
+
+    try {
+      if (trimmedValue) {
+        await updateTodo(editingId, trimmedValue);
       } else {
-        deleteTodo(editingId);
+        await deleteTodo(editingId);
       }
+      setEditingId(null);
+      setEditValue('');
+    } catch {
+      // Якщо помилка, ми нічого не робимо, інпут залишається
     }
-
-    if (editingId && editValue.trim()) {
-      updateTodo(editingId, editValue.trim());
-    }
-
-    setEditingId(null);
-    setEditValue('');
-  };
-
-  const handleCancel = () => {
-    setEditingId(null);
-    setEditValue('');
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      handleSave();
-    } else if (event.key === 'Escape') {
-      handleCancel();
-    }
-  };
-
-  const handleBlur = () => {
-    handleSave();
+    if (event.key === 'Enter') handleSave();
+    else if (event.key === 'Escape') setEditingId(null);
   };
 
   return (
     <section className="todoapp__main" data-cy="TodoList">
       {todos.map(todo => {
-        const isTemp = tempTodo === todo.id;
+        const isTemp = todo.id === 0 || (todo as any).isTemp;
         const isDeleting = deletingTodos.includes(todo.id);
-        const showLoader = isTemp || isDeleting;
+        const isUpdating = updatingTodos.includes(todo.id);
+        const showLoader = isTemp || isDeleting || isUpdating;
 
         return (
           <div
@@ -82,7 +75,7 @@ export const TodoList: React.FC<TodoListProps> = ({
                 type="checkbox"
                 className="todo__status"
                 checked={todo.completed}
-                onChange={() => !isTemp && !isDeleting && toggleTodo(todo.id)}
+                onChange={() => toggleTodo(todo.id)}
                 disabled={isTemp || isDeleting}
               />
             </label>
@@ -95,31 +88,30 @@ export const TodoList: React.FC<TodoListProps> = ({
                 value={editValue}
                 onChange={e => setEditValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onBlur={handleBlur}
+                onBlur={handleSave}
                 autoFocus
               />
             ) : (
-              <span
-                data-cy="TodoTitle"
-                className="todo__title"
-                onDoubleClick={() =>
-                  !isTemp && !isDeleting && handleDoubleClick(todo)
-                }
-              >
-                {todo.title}
-              </span>
-            )}
-
-            {!isTemp && (
-              <button
-                type="button"
-                className="todo__remove"
-                data-cy="TodoDelete"
-                onClick={() => !isDeleting && deleteTodo(todo.id)}
-                disabled={isDeleting}
-              >
-                ×
-              </button>
+              <>
+                <span
+                  data-cy="TodoTitle"
+                  className="todo__title"
+                  onDoubleClick={() => !isTemp && handleDoubleClick(todo)}
+                >
+                  {todo.title}
+                </span>
+                {!isTemp && (
+                  <button
+                    type="button"
+                    className="todo__remove"
+                    data-cy="TodoDelete"
+                    onClick={() => deleteTodo(todo.id)}
+                    disabled={isDeleting}
+                  >
+                    ×
+                  </button>
+                )}
+              </>
             )}
 
             <div
