@@ -3,6 +3,7 @@ import { Todo } from '../types/Todo';
 
 interface TodoListProps {
   todos: Todo[];
+  tempTodo: Todo | null;
   toggleTodo: (id: number) => void;
   deleteTodo: (id: number) => void;
   updateTodo: (id: number, title: string) => void;
@@ -12,6 +13,7 @@ interface TodoListProps {
 
 export const TodoList: React.FC<TodoListProps> = ({
   todos,
+  tempTodo,
   toggleTodo,
   deleteTodo,
   updateTodo,
@@ -20,6 +22,7 @@ export const TodoList: React.FC<TodoListProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
+  const todosToDisplay = tempTodo ? [...todos, tempTodo] : todos;
 
   const handleDoubleClick = (todo: Todo) => {
     setEditingId(todo.id);
@@ -46,7 +49,6 @@ export const TodoList: React.FC<TodoListProps> = ({
       setEditingId(null);
       setEditValue('');
     } catch {
-      // Якщо помилка, ми нічого не робимо, інпут залишається
     }
   };
 
@@ -57,7 +59,7 @@ export const TodoList: React.FC<TodoListProps> = ({
 
   return (
     <section className="todoapp__main" data-cy="TodoList">
-      {todos.map(todo => {
+      {todosToDisplay.map(todo => {
         const isTemp = todo.id === 0 || (todo as any).isTemp;
         const isDeleting = deletingTodos.includes(todo.id);
         const isUpdating = updatingTodos.includes(todo.id);

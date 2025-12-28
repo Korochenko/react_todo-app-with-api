@@ -74,7 +74,7 @@ export const App: React.FC = () => {
     setIsSubmitting(true);
 
     const newTempTodo: Todo = {
-      id: 0, // Тимчасовий ID
+      id: 0,
       userId: todoService.USER_ID,
       title: trimmedTitle,
       completed: false,
@@ -108,7 +108,7 @@ export const App: React.FC = () => {
       );
     } catch (err) {
       showErrorMessage('Unable to update a todo');
-      throw err; // Важливо для TodoList
+      throw err;
     } finally {
       setUpdatingTodos(prev => prev.filter(id => id !== todoId));
     }
@@ -122,14 +122,17 @@ export const App: React.FC = () => {
     try {
       await todoService.deleteTodo(todoId);
       setTodos(prev => prev.filter(todo => todo.id !== todoId));
+
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
     } catch (err) {
       showErrorMessage('Unable to delete a todo');
-      throw err; // Важливо для TodoList
+      throw err;
     } finally {
       setDeletingTodos(prev => prev.filter(id => id !== todoId));
     }
   };
-
   const toggleTodo = async (todoId: number) => {
     const todo = todos.find(t => t.id === todoId);
     if (!todo) return;
@@ -175,16 +178,34 @@ export const App: React.FC = () => {
     const completedTodos = todos.filter(todo => todo.completed);
     setDeletingTodos(completedTodos.map(t => t.id));
 
-    try {
-      await Promise.all(
-        completedTodos.map(todo => todoService.deleteTodo(todo.id)),
-      );
-      setTodos(prev => prev.filter(todo => !todo.completed));
-    } catch {
-      showErrorMessage('Unable to delete a todo');
-    } finally {
-      setDeletingTodos([]);
+    const results = await Promise.allSettled(
+      completedTodos.map(todo => todoService.deleteTodo(todo.id)),
+    );
+
+    const successfullyDeletedIds: number[] = [];
+    let hasErrors = false;
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        successfullyDeletedIds.push(completedTodos[index].id);
+      } else {
+        hasErrors = true;
+      }
+    });
+
+    if (successfullyDeletedIds.length > 0) {
+      setTodos(prev => prev.filter(todo => !successfullyDeletedIds.includes(todo.id)));
     }
+
+    if (hasErrors) {
+      showErrorMessage('Unable to delete a todo');
+    }
+
+    setDeletingTodos([]);
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   };
 
   const filteredTodos = todos.filter(todo => {
